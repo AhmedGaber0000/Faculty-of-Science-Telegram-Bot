@@ -121,6 +121,7 @@ function handleCallback($callback_query, $adminUserId, $apiUrl) {
 // 1. WEBHOOK SETUP LOGIC
 // This part only runs if you visit "your-url.vercel.app/api/bot.php?action=set_webhook"
 if (isset($_GET['action']) && $_GET['action'] == 'set_webhook') {
+    echo "ahmed"
     startWebhook($HOST_URL, $API_URL);
     exit();
 }
