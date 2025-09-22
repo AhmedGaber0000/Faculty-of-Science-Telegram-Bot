@@ -253,6 +253,6 @@ if (isset($update["callback_query"])) {
 }
 
 // ------ Close Database Connection ------
-$conn->close();
+// $conn->close();
 
 ?>
