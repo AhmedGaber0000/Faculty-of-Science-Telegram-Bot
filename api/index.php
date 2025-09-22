@@ -12,6 +12,10 @@ function logActivity($message) {
  * Sends a request to the Telegram Bot API.
  */
 
+$BOT_TOKEN = $_ENV['BOT_TOKEN'];
+$ADMIN_USER_ID = $_ENV['ADMIN_USER_ID'];
+$HOST_URL = $_ENV['HOST_URL'];
+
 $API_URL = 'https://api.telegram.org/bot' . $BOT_TOKEN . '/';
 
 function apiRequest($method, $parameters) {
@@ -129,9 +133,6 @@ function handleCallback($callback_query, $ADMIN_USER_ID) {
 
     list($prefix, $data) = explode('_', $callback_data, 2);
 }
-
-
-require_once 'config.php'; // Use require_once for essential files
 
 if (isset($_GET['action']) && $_GET['action'] == 'set_webhook') {
     // You need to pass the URL from your config file here
