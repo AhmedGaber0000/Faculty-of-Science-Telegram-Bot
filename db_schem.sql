@@ -1,0 +1,30 @@
+CREATE TABLE IF NOT EXISTS `User` (
+    `Chat_ID` BIGINT PRIMARY KEY,
+    `Status` VARCHAR(50)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `Menu` (
+    `menu_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `Type` VARCHAR(100) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `Button` (
+    `button_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `Name` VARCHAR(255) NOT NULL,
+    `goes_to_menu_id` INT UNSIGNED,
+    FOREIGN KEY (`goes_to_menu_id`) REFERENCES `Menu`(`menu_id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `Material` (
+    `Msg_ID` BIGINT PRIMARY KEY,
+    `button_id` INT UNSIGNED,
+    FOREIGN KEY (`button_id`) REFERENCES `Button`(`button_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `MenuButtonBuild` (
+    `menu_id` INT UNSIGNED,
+    `button_id` INT UNSIGNED,
+    PRIMARY KEY (`menu_id`, `button_id`),
+    FOREIGN KEY (`menu_id`) REFERENCES `Menu`(`menu_id`) ON DELETE CASCADE,
+    FOREIGN KEY (`button_id`) REFERENCES `Button`(`button_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
