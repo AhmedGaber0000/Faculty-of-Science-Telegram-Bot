@@ -11,6 +11,9 @@ function logActivity($message) {
 /**
  * Sends a request to the Telegram Bot API.
  */
+
+$API_URL = 'https://api.telegram.org/bot' . $BOT_TOKEN . '/';
+
 function apiRequest($method, $parameters) {
     global $API_URL; // Get the global API URL variable
 
@@ -31,8 +34,17 @@ function apiRequest($method, $parameters) {
     curl_setopt($handle, CURLOPT_CONNECTTIMEOUT, 5);
     curl_setopt($handle, CURLOPT_TIMEOUT, 60);
     $response = curl_exec($handle);
+    
+    if ($response === false) {
+        $error = curl_error($handle);
+        logActivity("cURL Error for method '{$method}': " . $error);
+        curl_close($handle);
+        return false; // Explicitly return false on error
+    }
+    
     curl_close($handle);
     return $response;
+
 }
 
 /**
@@ -127,16 +139,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'set_webhook') {
     exit(); // Stop the script after setting the webhook.
 }
 
-$API_URL = 'https://api.telegram.org/bot' . $BOT_TOKEN . '/';
 $ADMIN_USER_ID = 5833709924; 
-
-
-if (isset($_GET['action'])) {
-    if ($_GET['action'] == 'set_webhook') {
-        startWebhook(); // Call the function to set the webhook
-        exit();         // And stop the script immediately after.
-    }
-}
 
 // --- Regular Bot Logic for Telegram Updates ---
 // This part only runs if the URL does not contain "?action=..."
