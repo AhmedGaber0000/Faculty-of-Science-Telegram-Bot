@@ -74,9 +74,7 @@ function forwardMessage($to_chat_id, $from_chat_id, $message_id) {
     ]);
 }
 
-function handleMessage($message) {
-    global $conn, $ADMIN_USER_ID;
-
+function handleMessage($message, $ADMIN_USER_ID) {
     $chat_id = $message['chat']['id'];
     $text = isset($message['text']) ? $message['text'] : ''; // Handle cases with no text (e.g., file forwards)
     $user_id = $message['from']['id'];
@@ -85,36 +83,6 @@ function handleMessage($message) {
     // --- LOGGING ---: Log the incoming message
     logActivity("Message from UserID: {$user_id} (@{$username}), ChatID: {$chat_id}, Text: '{$text}'");
 
-    // --- ADMIN: Adding a file ---
-    if ($user_id == $ADMIN_USER_ID && isset($message['forward_from_chat'])) {
-        logActivity("Admin action: Received forwarded message for file addition.");
-        $caption = isset($message['caption']) ? $message['caption'] : '';
-        if ($caption && strpos($caption, ';') !== false) {
-            list($subject, $file_name) = explode(';', $caption, 2);
-            $subject = trim($subject);
-            $file_name = trim($file_name);
-            
-            $forwarded_msg_id = $message['forward_from_message_id'];
-            $forwarded_chat_id = $message['forward_from_chat']['id'];
-
-            $stmt = $conn->prepare("INSERT INTO files (subject, file_name, message_id, chat_id) VALUES (?, ?, ?, ?)");
-            $stmt->bind_param("ssii", $subject, $file_name, $forwarded_msg_id, $forwarded_chat_id);
-            
-            if ($stmt->execute()) {
-                $log_msg = "SUCCESS: Admin added file '{$file_name}' to subject '{$subject}'.";
-                sendMessage($chat_id, "✅ File added successfully.");
-            } else {
-                $log_msg = "ERROR: Failed to add file to database. Error: " . $stmt->error;
-                sendMessage($chat_id, "❌ Database error while adding file.");
-            }
-            logActivity($log_msg);
-            $stmt->close();
-        } else {
-            logActivity("Admin error: Forwarded file is missing a valid caption.");
-            sendMessage($chat_id, "⚠️ Please forward the file with a caption in the format: Subject; File Name");
-        }
-        return;
-    }
 
     // --- USER COMMANDS ---
     switch ($text) {
@@ -123,35 +91,7 @@ function handleMessage($message) {
             sendMessage($chat_id, $reply);
             break;
 
-        case '/files':
-            $result = $conn->query("SELECT DISTINCT subject FROM files ORDER BY subject ASC");
-            if (!$result) {
-                logActivity("ERROR: Database query for subjects failed: " . $conn->error);
-                sendMessage($chat_id, "Sorry, there was an error fetching subjects.");
-                return;
-            }
-            $subjects = [];
-            while ($row = $result->fetch_assoc()) {
-                $subjects[] = $row['subject'];
-            }
 
-            if (empty($subjects)) {
-                sendMessage($chat_id, "Sorry, no files have been organized yet.");
-                logActivity("Info: User requested files, but none are in the database.");
-                return;
-            }
-
-            $keyboard = [];
-            foreach ($subjects as $subject) {
-                $keyboard[][] = ['text' => $subject, 'callback_data' => 'subj_' . $subject];
-            }
-            
-            $reply_markup = json_encode(['inline_keyboard' => $keyboard]);
-            sendMessage($chat_id, "Please select a subject:", $reply_markup);
-            logActivity("Displayed subject list to UserID: {$user_id}");
-            break;
-
-        // Add a default case for unknown commands
         default:
             if (substr($text, 0, 1) === '/') { // It's a command but not one we know
                  logActivity("User {$user_id} sent unknown command: {$text}");
@@ -163,8 +103,7 @@ function handleMessage($message) {
 
 
 // ------ FUNCTION TO HANDLE BUTTON CLICKS (CALLBACKS) ------
-function handleCallback($callback_query) {
-    global $conn;
+function handleCallback($callback_query, $ADMIN_USER_ID) {
 
     $chat_id = $callback_query['message']['chat']['id'];
     $user_id = $callback_query['from']['id'];
@@ -177,39 +116,17 @@ function handleCallback($callback_query) {
     apiRequest("answerCallbackQuery", ['callback_query_id' => $callback_query['id']]);
 
     list($prefix, $data) = explode('_', $callback_data, 2);
-
-    if ($prefix == 'subj') {
-        $subject = $data;
-        $stmt = $conn->prepare("SELECT id, file_name FROM files WHERE subject = ? ORDER BY file_name ASC");
-        $stmt->bind_param("s", $subject);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        // ... (rest of the callback logic from previous example)
-    } elseif ($prefix == 'file') {
-        $file_id_in_db = (int)$data;
-        $stmt = $conn->prepare("SELECT message_id, chat_id FROM files WHERE id = ?");
-        $stmt->bind_param("i", $file_id_in_db);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $file = $result->fetch_assoc();
-
-        if ($file) {
-            logActivity("Forwarding file (DB ID: {$file_id_in_db}) to UserID: {$user_id}");
-            forwardMessage($chat_id, $file['chat_id'], $file['message_id']);
-        } else {
-            logActivity("ERROR: User {$user_id} requested a file (DB ID: {$file_id_in_db}) that was not found.");
-            sendMessage($chat_id, "Sorry, I couldn't find that file.");
-        }
-    } elseif ($prefix == 'back') {
-        logActivity("User {$user_id} clicked 'Back to Subjects'");
-        handleMessage(['chat' => ['id' => $chat_id], 'text' => '/files', 'from' => ['id' => $user_id]]);
-    }
 }
 
 
 require_once 'config.php'; // Use require_once for essential files
 
-startWebhook($Host_URL)
+if (isset($_GET['action']) && $_GET['action'] == 'set_webhook') {
+    // You need to pass the URL from your config file here
+    startWebhook($Host_URL); 
+    exit(); // Stop the script after setting the webhook.
+}
+
 $API_URL = 'https://api.telegram.org/bot' . $BOT_TOKEN . '/';
 $ADMIN_USER_ID = 5833709924; 
 
@@ -245,9 +162,9 @@ logActivity("Raw Update: " . $raw_update);
 $update = json_decode($raw_update, TRUE);
 
 if (isset($update["callback_query"])) {
-    handleCallback($update["callback_query"]);
+    handleCallback($update["callback_query"], $ADMIN_USER_ID);
 } elseif (isset($update["message"])) {
-    handleMessage($update["message"]);
+    handleMessage($update["message"], $ADMIN_USER_ID);
 } else {
     logActivity("WARNING: Unhandled update type received.");
 }
